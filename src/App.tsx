@@ -5,7 +5,6 @@ import {
   Copy,
   Check,
   Printer,
-  Globe,
   RotateCcw,
   Sparkles,
   Info,
@@ -13,13 +12,11 @@ import {
   MessageCircle,
   Building2,
   User,
-  Download,
 } from 'lucide-react';
 import { PILLARS, Pillar, WHATSAPP_PHONE, getDiagnosis } from './data/pillars';
 import { SacredGeometry } from './components/SacredGeometry';
 import { RadarChart } from './components/RadarChart';
 import { PillarModal } from './components/PillarModal';
-import { VercelGuideModal } from './components/VercelGuideModal';
 import { LeadCaptureStep, LeadFormData } from './components/LeadCaptureStep';
 
 type AppStep = 'welcome' | 'quiz' | 'lead_capture' | 'result';
@@ -60,7 +57,6 @@ export default function App() {
   });
 
   const [selectedPillarForModal, setSelectedPillarForModal] = useState<Pillar | null>(null);
-  const [isVercelModalOpen, setIsVercelModalOpen] = useState<boolean>(false);
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const hasSentInitialEmail = useRef<boolean>(false);
 
@@ -268,33 +264,6 @@ export default function App() {
       {/* Background Sacred Geometry Watermarks with Smooth Cosmic Rotation */}
       <SacredGeometry className="pointer-events-none absolute -right-36 -top-36 w-[32rem] sm:w-[38rem] animate-spin-slow opacity-35" />
       <SacredGeometry className="pointer-events-none absolute -bottom-48 -left-48 w-[34rem] sm:w-[42rem] animate-spin-slow opacity-25" />
-
-      {/* Floating Top Bar (Discreet and elegant) */}
-      <div className="relative mx-auto max-w-3xl flex justify-between items-center mb-4 text-xs text-muted-foreground">
-        <span className="tracking-widest uppercase text-[10px] sm:text-xs text-primary/80">
-          Método Berkana Empresarial
-        </span>
-        <div className="flex items-center gap-2">
-          <a
-            href="/diagnostico-berkana.zip"
-            download="diagnostico-berkana.zip"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-primary/40 bg-primary/10 text-primary hover:bg-primary/20 transition-all duration-200 font-medium"
-            title="Baixar arquivo ZIP completo do projeto para publicar na Vercel"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Baixar ZIP Vercel</span>
-          </a>
-          <button
-            onClick={() => setIsVercelModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-border/80 bg-card/60 backdrop-blur hover:border-primary/60 hover:text-foreground transition-all duration-200"
-            title="Guia de publicação na Vercel e configuração do e-mail"
-          >
-            <Globe className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Guia Vercel & E-mail</span>
-            <span className="sm:hidden">Guia</span>
-          </button>
-        </div>
-      </div>
 
       <div className="relative mx-auto max-w-2xl">
         {/* ===================== WELCOME VIEW ===================== */}
@@ -704,12 +673,6 @@ export default function App() {
         pillar={selectedPillarForModal}
         score={selectedPillarForModal ? scores[selectedPillarForModal.id - 1] : 5}
         onClose={() => setSelectedPillarForModal(null)}
-      />
-
-      {/* Vercel Publication & Custom Domain Guide */}
-      <VercelGuideModal
-        isOpen={isVercelModalOpen}
-        onClose={() => setIsVercelModalOpen(false)}
       />
     </main>
   );
