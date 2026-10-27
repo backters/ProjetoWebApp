@@ -231,8 +231,54 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
           recipient: recipientEmail,
         };
       } else {
-        const errText = await res.text();
-        console.warn(`[EmailService] Falha na API do Resend:`, errText);
+        const errJson = await res.json().catch(() => ({}));
+        console.warn(`[EmailService] Resend API retornou status ${res.status}:`, errJson);
+
+        // Se o Resend bloquear porque o domínio ainda não foi verificado na conta gratuita:
+        if (
+          errJson?.statusCode === 403 &&
+          errJson?.message?.includes('You can only send testing emails to your own email address')
+        ) {
+          const match = errJson.message.match(/your own email address \(([^)]+)\)/);
+          const accountEmail = match ? match[1] : null;
+
+          if (accountEmail && accountEmail !== recipientEmail) {
+            console.log(`[EmailService] Entregando na conta Resend (${accountEmail}) devido à política de teste...`);
+            const fallbackRes = await fetch('https://api.resend.com/emails', {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+                to: [accountEmail],
+                reply_to: data.leadEmail || undefined,
+                subject: `[Para: ${recipientEmail}] ${subject}`,
+                html: `
+                  <div style="background-color:#fff1f2;border:1px solid #f43f5e;border-radius:12px;padding:16px;margin-bottom:20px;font-family:sans-serif;color:#9f1239;font-size:13px;line-height:1.6;">
+                    <strong style="font-size:14px;display:block;margin-bottom:4px;">📌 Aviso de Configuração do Resend:</strong>
+                    Este diagnóstico foi direcionado para <strong>${recipientEmail}</strong>. No entanto, como a conta do Resend ainda não possui um domínio próprio verificado, a política de testes do Resend entrega apenas no e-mail do titular da conta (<strong>${accountEmail}</strong>).<br><br>
+                    <strong>Como enviar direto para ${recipientEmail}:</strong><br>
+                    1. Crie a conta no Resend diretamente com ${recipientEmail}, <strong>OU</strong><br>
+                    2. Verifique seu domínio (ex: seusite.com.br) no menu <em>Domains</em> do Resend, <strong>OU</strong><br>
+                    3. Configure uma regra de encaminhamento no Gmail de ${accountEmail} para ${recipientEmail}.
+                  </div>
+                ` + htmlContent,
+              }),
+            });
+
+            if (fallbackRes.ok) {
+              console.log(`[EmailService] Entregue com sucesso na conta vinculada: ${accountEmail}`);
+              return {
+                success: true,
+                message: `E-mail entregue em ${accountEmail} (o Resend no plano de testes sem domínio entrega na conta do titular).`,
+                provider: 'resend',
+                recipient: accountEmail,
+              };
+            }
+          }
+        }
       }
     } catch (err) {
       console.error(`[EmailService] Erro ao chamar Resend:`, err);
