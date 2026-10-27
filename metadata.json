@@ -1,0 +1,6 @@
+{
+  "name": "Diagnóstico Estratégico de Prosperidade",
+  "description": "Avalie os 12 pilares da sua empresa com o Método Berkana Empresarial de Fabiana Berkana e descubra seus potenciais ocultos.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
