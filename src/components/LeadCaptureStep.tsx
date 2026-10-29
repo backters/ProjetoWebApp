@@ -22,6 +22,10 @@ export const LeadCaptureStep: React.FC<LeadCaptureStepProps> = ({
 }) => {
   const [formData, setFormData] = useState<LeadFormData>(initialData);
 
+  React.useEffect(() => {
+    setFormData(initialData);
+  }, [initialData]);
+
   const formatPhone = (value: string) => {
     const numbers = value.replace(/\D/g, '').slice(0, 11);
     if (numbers.length <= 2) return numbers;

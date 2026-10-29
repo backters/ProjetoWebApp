@@ -21,64 +21,51 @@ import { LeadCaptureStep, LeadFormData } from './components/LeadCaptureStep';
 
 type AppStep = 'welcome' | 'quiz' | 'lead_capture' | 'result';
 
+interface CompletedDiagnosis {
+  scores: number[];
+  averageScore: number;
+  lowestThree: Array<{ score: number; pillar: Pillar; index: number }>;
+  highestThree: Array<{ score: number; pillar: Pillar; index: number }>;
+  primaryUnblockPillar: Pillar;
+  leadName?: string;
+  companyName?: string;
+  whatsAppUrl: string;
+}
+
 export default function App() {
   const [step, setStep] = useState<AppStep>('welcome');
   const [currentIndex, setCurrentIndex] = useState<number>(0);
-  const [scores, setScores] = useState<number[]>(() => {
-    try {
-      const saved = localStorage.getItem('berkana_scores');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length === 12) {
-          return parsed;
-        }
-      }
-    } catch {
-      // fallback
-    }
-    return Array(12).fill(5);
-  });
 
-  const [leadInfo, setLeadInfo] = useState<LeadFormData>(() => {
-    try {
-      const saved = localStorage.getItem('berkana_lead');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch {
-      // fallback
-    }
-    return {
-      name: '',
-      email: '',
-      phone: '',
-      company: localStorage.getItem('berkana_company') || '',
-    };
-  });
+  // Initial state: all 12 pillars in the middle (5)
+  const [scores, setScores] = useState<number[]>(() => Array(12).fill(5));
+
+  // Initial state: all input fields blank
+  const [leadInfo, setLeadInfo] = useState<LeadFormData>(() => ({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+  }));
+
+  // Holds the completed report snapshot for the result screen while active inputs are reset
+  const [completedDiagnosis, setCompletedDiagnosis] = useState<CompletedDiagnosis | null>(null);
 
   const [selectedPillarForModal, setSelectedPillarForModal] = useState<Pillar | null>(null);
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const hasSentInitialEmail = useRef<boolean>(false);
 
-  // Sync to local storage
+  // Clear any previous session data on load to guarantee pristine initial state (blank & 5)
   useEffect(() => {
     try {
-      localStorage.setItem('berkana_scores', JSON.stringify(scores));
+      localStorage.removeItem('berkana_scores');
+      localStorage.removeItem('berkana_lead');
+      localStorage.removeItem('berkana_company');
     } catch {
       // Ignore
     }
-  }, [scores]);
+  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('berkana_lead', JSON.stringify(leadInfo));
-      localStorage.setItem('berkana_company', leadInfo.company);
-    } catch {
-      // Ignore
-    }
-  }, [leadInfo]);
-
-  // Average score & sorted pillars
+  // Average score & sorted pillars for active quiz
   const averageScore = useMemo(() => {
     const sum = scores.reduce((acc, curr) => acc + curr, 0);
     return sum / 12;
@@ -95,33 +82,41 @@ export default function App() {
   const primaryUnblockPillar = lowestThree[0]?.pillar || PILLARS[0];
 
   // Silently dispatch email to fabianaberkana@gmail.com without showing any UI indicators
-  const silentDispatchEmail = async (contactData: LeadFormData) => {
+  const silentDispatchEmail = async (contactData: LeadFormData, activeScores = scores) => {
     try {
+      const activeAvg = activeScores.reduce((a, b) => a + b, 0) / 12;
+      const sorted = activeScores
+        .map((score, index) => ({ score, pillar: PILLARS[index], index }))
+        .sort((a, b) => a.score - b.score);
+      const low3 = sorted.slice(0, 3);
+      const high3 = sorted.slice(-3).reverse();
+      const unblock = low3[0]?.pillar || PILLARS[0];
+
       const payload = {
-        leadName: contactData.name || 'Participante (Pendente/Opcional)',
+        leadName: contactData.name || (contactData.company ? `Empresa ${contactData.company}` : 'Participante (Pendente/Opcional)'),
         leadEmail: contactData.email || '',
         leadPhone: contactData.phone || '',
         companyName: contactData.company || '',
-        scores,
-        averageScore,
-        lowestThree: lowestThree.map((item) => ({
+        scores: activeScores,
+        averageScore: activeAvg,
+        lowestThree: low3.map((item) => ({
           id: item.pillar.id,
           name: item.pillar.name,
           score: item.score,
           subtitle: item.pillar.subtitle,
         })),
-        highestThree: highestThree.map((item) => ({
+        highestThree: high3.map((item) => ({
           id: item.pillar.id,
           name: item.pillar.name,
           score: item.score,
           subtitle: item.pillar.subtitle,
         })),
         primaryUnblockPillar: {
-          id: primaryUnblockPillar.id,
-          name: primaryUnblockPillar.name,
-          subtitle: primaryUnblockPillar.subtitle,
+          id: unblock.id,
+          name: unblock.name,
+          subtitle: unblock.subtitle,
         },
-        diagnosisText: getDiagnosis(averageScore),
+        diagnosisText: getDiagnosis(activeAvg),
         submittedAt: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
       };
 
@@ -138,11 +133,8 @@ export default function App() {
 
   // Called immediately when quiz reaches the end
   const handleFinishQuiz = () => {
-    // 1. Immediately send results to fabianaberkana@gmail.com right as results are generated!
     hasSentInitialEmail.current = true;
-    silentDispatchEmail(leadInfo);
-
-    // 2. Transition to optional lead details screen
+    silentDispatchEmail(leadInfo, scores);
     setStep('lead_capture');
   };
 
@@ -200,43 +192,94 @@ export default function App() {
   const currentScore = scores[currentIndex] ?? 5;
   const currentPillar = PILLARS[currentIndex];
 
+  // Finalize diagnosis: send email, snapshot result, and restore all inputs to blank and selections to 5
   const handleLeadSubmit = (formData: LeadFormData) => {
-    setLeadInfo(formData);
-    // If the user entered any details (name, phone, email, or company), send the updated lead info
+    const currentScoresSnapshot = [...scores];
+    const currentAverageSnapshot = averageScore;
+    const currentLowestSnapshot = [...lowestThree];
+    const currentHighestSnapshot = [...highestThree];
+    const currentUnblockSnapshot = primaryUnblockPillar;
+
+    const targetText = `Olá Fabiana! Fiz o Diagnóstico Estratégico de Prosperidade${
+      formData.company ? ` para a empresa "${formData.company}"` : ''
+    }${formData.name ? ` (${formData.name})` : ''} com média geral de ${currentAverageSnapshot.toFixed(
+      1
+    )}/10. O principal ponto a harmonizar foi "${
+      currentUnblockSnapshot.name
+    }" e quero agendar minha devolutiva completa.`;
+    const finalWhatsAppUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(targetText)}`;
+
+    // 1. Snapshot the completed diagnosis for display
+    setCompletedDiagnosis({
+      scores: currentScoresSnapshot,
+      averageScore: currentAverageSnapshot,
+      lowestThree: currentLowestSnapshot,
+      highestThree: currentHighestSnapshot,
+      primaryUnblockPillar: currentUnblockSnapshot,
+      leadName: formData.name,
+      companyName: formData.company,
+      whatsAppUrl: finalWhatsAppUrl,
+    });
+
+    // 2. Send email with the final completed contact data
     if (formData.name || formData.email || formData.phone || formData.company) {
-      silentDispatchEmail(formData);
+      silentDispatchEmail(formData, currentScoresSnapshot);
     }
+
+    // 3. RESTORE ALL FORM INPUTS AND ALL SELECTIONS TO INITIAL STATE:
+    // Dados em branco e seleções no meio (5)
+    setScores(Array(12).fill(5));
+    setLeadInfo({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+    });
+    setCurrentIndex(0);
+    hasSentInitialEmail.current = false;
+
+    try {
+      localStorage.removeItem('berkana_scores');
+      localStorage.removeItem('berkana_lead');
+      localStorage.removeItem('berkana_company');
+    } catch {
+      // Ignore
+    }
+
+    // 4. Move to result view
     setStep('result');
   };
 
-  // Personalized WhatsApp URL
-  const whatsAppUrl = useMemo(() => {
-    const targetText = `Olá Fabiana! Fiz o Diagnóstico Estratégico de Prosperidade${
-      leadInfo.company ? ` para a empresa "${leadInfo.company}"` : ''
-    }${leadInfo.name ? ` (${leadInfo.name})` : ''} com média geral de ${averageScore.toFixed(
-      1
-    )}/10. O principal ponto a harmonizar foi "${
-      primaryUnblockPillar.name
-    }" e quero agendar minha devolutiva completa.`;
-    return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(targetText)}`;
-  }, [averageScore, leadInfo, primaryUnblockPillar]);
+  // Data displayed on result screen (from snapshot or active)
+  const displayScores = completedDiagnosis ? completedDiagnosis.scores : scores;
+  const displayAverage = completedDiagnosis ? completedDiagnosis.averageScore : averageScore;
+  const displayLowest = completedDiagnosis ? completedDiagnosis.lowestThree : lowestThree;
+  const displayHighest = completedDiagnosis ? completedDiagnosis.highestThree : highestThree;
+  const displayUnblock = completedDiagnosis ? completedDiagnosis.primaryUnblockPillar : primaryUnblockPillar;
+  const displayCompanyName = completedDiagnosis ? completedDiagnosis.companyName : leadInfo.company;
+  const displayLeadName = completedDiagnosis ? completedDiagnosis.leadName : leadInfo.name;
+  const displayWhatsAppUrl = completedDiagnosis
+    ? completedDiagnosis.whatsAppUrl
+    : `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(
+        `Olá Fabiana! Fiz o Diagnóstico Estratégico de Prosperidade com média geral de ${displayAverage.toFixed(1)}/10.`
+      )}`;
 
   // Copy textual summary to clipboard
   const handleCopySummary = () => {
     const lines = [
       `🌟 Diagnóstico Estratégico de Prosperidade | Método Berkana`,
-      leadInfo.name ? `Participante: ${leadInfo.name}` : '',
-      leadInfo.company ? `Empresa: ${leadInfo.company}` : '',
-      `Média Geral: ${averageScore.toFixed(1)}/10`,
+      displayLeadName ? `Participante: ${displayLeadName}` : '',
+      displayCompanyName ? `Empresa: ${displayCompanyName}` : '',
+      `Média Geral: ${displayAverage.toFixed(1)}/10`,
       ``,
       `✨ Maiores Potenciais:`,
-      ...highestThree.map((item) => `• ${item.pillar.name}: ${item.score}/10`),
+      ...displayHighest.map((item) => `• ${item.pillar.name}: ${item.score}/10`),
       ``,
       `🎯 Pontos de Harmonização:`,
-      ...lowestThree.map((item) => `• ${item.pillar.name}: ${item.score}/10`),
+      ...displayLowest.map((item) => `• ${item.pillar.name}: ${item.score}/10`),
       ``,
-      `⚡ Principal Porta de Desobstrução: ${primaryUnblockPillar.name}`,
-      `Orientação: ${getDiagnosis(averageScore)}`,
+      `⚡ Principal Porta de Desobstrução: ${displayUnblock.name}`,
+      `Orientação: ${getDiagnosis(displayAverage)}`,
       ``,
       `Realizado com o Método Berkana de Fabiana Berkana.`,
     ]
@@ -252,10 +295,25 @@ export default function App() {
     window.print();
   };
 
+  // Restart diagnosis: everything back to blank and 5
   const handleRestart = () => {
     setScores(Array(12).fill(5));
+    setLeadInfo({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+    });
     setCurrentIndex(0);
     hasSentInitialEmail.current = false;
+    setCompletedDiagnosis(null);
+    try {
+      localStorage.removeItem('berkana_scores');
+      localStorage.removeItem('berkana_lead');
+      localStorage.removeItem('berkana_company');
+    } catch {
+      // Ignore
+    }
     setStep('welcome');
   };
 
@@ -287,7 +345,7 @@ export default function App() {
               Criado por Fabiana Berkana, este diagnóstico une a sua percepção prática de empresário à harmonização sistêmica e à radiestesia, revelando potenciais de crescimento e pontos ocultos nos 12 pilares do seu negócio.
             </p>
 
-            {/* Optional Initial Identification */}
+            {/* Optional Initial Identification (Blank by default) */}
             <div className="mt-8 w-full max-w-sm space-y-3 text-left">
               <div>
                 <label htmlFor="company" className="block text-xs uppercase tracking-wider text-muted-foreground mb-1.5 ml-1">
@@ -388,7 +446,7 @@ export default function App() {
                 {currentScore}
               </div>
 
-              {/* Interactive Smooth Range Slider */}
+              {/* Interactive Smooth Range Slider (Centered at 5 initially) */}
               <div className="px-1">
                 <input
                   type="range"
@@ -485,14 +543,14 @@ export default function App() {
               <p className="text-xs uppercase tracking-[0.35em] text-primary font-medium">
                 Seu Mapa de Prosperidade
               </p>
-              {leadInfo.company && (
+              {displayCompanyName && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Avaliação para: <strong className="text-foreground">{leadInfo.company}</strong>
-                  {leadInfo.name ? ` · Líder: ${leadInfo.name}` : ''}
+                  Avaliação para: <strong className="text-foreground">{displayCompanyName}</strong>
+                  {displayLeadName ? ` · Líder: ${displayLeadName}` : ''}
                 </p>
               )}
               <h1 className="mt-3 text-4xl sm:text-5xl font-medium tracking-tight">
-                Média geral <span className="text-gold-gradient font-bold">{averageScore.toFixed(1)}</span>
+                Média geral <span className="text-gold-gradient font-bold">{displayAverage.toFixed(1)}</span>
               </h1>
               <p className="mt-1 text-xs text-muted-foreground">
                 Baseado na harmonia sistêmica dos 12 pilares empresariais
@@ -502,7 +560,7 @@ export default function App() {
             {/* Radar Chart Display */}
             <div className="flex flex-col items-center rounded-3xl border border-border bg-card/80 p-5 sm:p-6 backdrop-blur-md shadow-2xl">
               <RadarChart
-                scores={scores}
+                scores={displayScores}
                 onSelectPillar={(index) => setSelectedPillarForModal(PILLARS[index])}
               />
               <p className="mt-3 text-[11px] text-muted-foreground text-center">
@@ -523,7 +581,7 @@ export default function App() {
                       <span className="text-primary font-medium">{idx + 1}.</span> {pillar.name}
                     </span>
                     <span className="text-foreground font-semibold shrink-0">
-                      {scores[idx]}
+                      {displayScores[idx]}
                     </span>
                   </li>
                 ))}
@@ -542,7 +600,7 @@ export default function App() {
                   Pilares que pedem atenção e destravamento para desbloquear o fluxo:
                 </p>
                 <ul className="space-y-2.5">
-                  {lowestThree.map(({ pillar, score }) => (
+                  {displayLowest.map(({ pillar, score }) => (
                     <li
                       key={pillar.id}
                       onClick={() => setSelectedPillarForModal(pillar)}
@@ -568,7 +626,7 @@ export default function App() {
                   Pilares sólidos e de alta vibração que impulsionam o seu negócio:
                 </p>
                 <ul className="space-y-2.5">
-                  {highestThree.map(({ pillar, score }) => (
+                  {displayHighest.map(({ pillar, score }) => (
                     <li
                       key={pillar.id}
                       onClick={() => setSelectedPillarForModal(pillar)}
@@ -599,12 +657,12 @@ export default function App() {
               </div>
 
               <p className="mt-4 leading-relaxed text-base sm:text-lg text-foreground/95">
-                {getDiagnosis(averageScore)}
+                {getDiagnosis(displayAverage)}
               </p>
 
               <div className="mt-4 p-4 rounded-2xl bg-muted/40 border border-border/80">
                 <p className="leading-relaxed text-sm text-muted-foreground">
-                  O pilar <strong className="text-primary font-semibold">{primaryUnblockPillar.name}</strong> é hoje a principal porta de desobstrução — ao harmonizá-lo, toda a roda se reequilibra.
+                  O pilar <strong className="text-primary font-semibold">{displayUnblock.name}</strong> é hoje a principal porta de desobstrução — ao harmonizá-lo, toda a roda se reequilibra.
                 </p>
               </div>
 
@@ -616,7 +674,7 @@ export default function App() {
             {/* Primary Action Button (WhatsApp Devolutiva) */}
             <div className="text-center space-y-4 pt-2">
               <a
-                href={whatsAppUrl}
+                href={displayWhatsAppUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-gold-gradient px-8 py-4 font-semibold text-primary-foreground shadow-glow hover:scale-105 active:scale-95 transition-all text-base sm:text-lg cursor-pointer w-full sm:w-auto"
@@ -671,7 +729,7 @@ export default function App() {
       {/* Deep Reflection Modal for selected pillar */}
       <PillarModal
         pillar={selectedPillarForModal}
-        score={selectedPillarForModal ? scores[selectedPillarForModal.id - 1] : 5}
+        score={selectedPillarForModal ? displayScores[selectedPillarForModal.id - 1] : 5}
         onClose={() => setSelectedPillarForModal(null)}
       />
     </main>
