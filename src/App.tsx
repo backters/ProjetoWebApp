@@ -51,7 +51,7 @@ export default function App() {
   // Holds the completed report snapshot for the result screen while active inputs are reset
   const [completedDiagnosis, setCompletedDiagnosis] = useState<CompletedDiagnosis | null>(null);
 
-  // Theme mockup state: 5 sophisticated options (defaults to Marfim & Magenta Real)
+  // Theme mockup state: 10 sophisticated options (5 light, 5 dark)
   const [theme, setTheme] = useState<ThemeId>(() => {
     try {
       const saved = localStorage.getItem('berkana_chosen_palette');
@@ -60,8 +60,13 @@ export default function App() {
         [
           'marfim-magenta',
           'champagne-oliva',
+          'perola-terracota',
+          'quartzo-vinho',
+          'salvia-ouro',
           'ameixa-ouro',
           'esmeralda-bronze',
+          'cacau-cobre',
+          'violeta-veludo',
           'cosmica-original',
         ].includes(saved)
       ) {
