@@ -30,9 +30,129 @@ export const PILLAR_NAMES = [
   'Legado e Impacto'
 ];
 
+export interface PreparedChart {
+  shortUrl: string;
+  base64: string;
+  buffer: Buffer;
+}
+
 /**
- * Generates a high-definition radar chart image URL via QuickChart.
+ * Prepares the radar chart image by creating a short URL and fetching the binary buffer.
  * Renders in the official Option 1 color palette (Marfim & Magenta Real).
+ */
+export async function prepareRadarChart(scores: number[]): Promise<PreparedChart | null> {
+  const labels = [
+    ['1. Missão', 'e Valores'],
+    ['2. Propósito', 'Organizacional'],
+    ['3. Cultura', 'e Clima'],
+    ['4. Comunicação', 'Interna'],
+    ['5. Liderança', 'e Decisão'],
+    ['6. Engajamento', 'da Equipe'],
+    ['7. Produtividade', 'com Equilíbrio'],
+    ['8. Inovação e', 'Criatividade'],
+    ['9. Crises e', 'Resiliência'],
+    ['10. Fluxo', 'Financeiro'],
+    ['11. Reputação', 'da Marca'],
+    ['12. Legado e', 'Impacto']
+  ];
+
+  const chartConfig = {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Pontuação (1-10)',
+          data: scores,
+          backgroundColor: 'rgba(212, 124, 52, 0.40)',
+          borderColor: '#88186D',
+          borderWidth: 3,
+          pointBackgroundColor: '#D47C34',
+          pointBorderColor: '#88186D',
+          pointBorderWidth: 2,
+          pointRadius: 5
+        }
+      ]
+    },
+    options: {
+      legend: { display: false },
+      scale: {
+        ticks: {
+          beginAtZero: true,
+          min: 0,
+          max: 10,
+          stepSize: 2,
+          fontColor: '#706861',
+          fontSize: 10,
+          backdropColor: 'transparent',
+          showLabelBackdrop: false
+        },
+        gridLines: {
+          color: 'rgba(136, 24, 109, 0.20)',
+          lineWidth: 1
+        },
+        angleLines: {
+          color: 'rgba(212, 124, 52, 0.32)',
+          lineWidth: 1
+        },
+        pointLabels: {
+          fontSize: 10.5,
+          fontColor: '#2D2825',
+          fontStyle: 'bold',
+          fontFamily: 'sans-serif'
+        }
+      }
+    }
+  };
+
+  try {
+    const createRes = await fetch('https://quickchart.io/chart/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chart: chartConfig,
+        width: 580,
+        height: 520,
+        backgroundColor: '#FAF6F0',
+        devicePixelRatio: 2
+      }),
+      signal: AbortSignal.timeout(6000)
+    });
+
+    if (!createRes.ok) {
+      console.warn('[EmailService] QuickChart create retornou status:', createRes.status);
+      return null;
+    }
+
+    const data = await createRes.json();
+    const shortUrl = data.url || '';
+
+    if (!shortUrl) return null;
+
+    // Fetch the PNG image binary
+    const imgRes = await fetch(shortUrl, { signal: AbortSignal.timeout(6000) });
+    if (!imgRes.ok) {
+      console.warn('[EmailService] Falha ao baixar imagem do QuickChart:', imgRes.status);
+      return null;
+    }
+
+    const arrayBuffer = await imgRes.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+
+    return {
+      shortUrl,
+      base64,
+      buffer
+    };
+  } catch (err) {
+    console.warn('[EmailService] Erro ao preparar gráfico de raio:', err);
+    return null;
+  }
+}
+
+/**
+ * Fallback URL generator if prepareRadarChart fails.
  */
 export function generateRadarChartUrl(scores: number[]): string {
   const labels = [
@@ -58,7 +178,7 @@ export function generateRadarChartUrl(scores: number[]): string {
         {
           label: 'Pontuação (1-10)',
           data: scores,
-          backgroundColor: 'rgba(212, 124, 52, 0.38)',
+          backgroundColor: 'rgba(212, 124, 52, 0.40)',
           borderColor: '#88186D',
           borderWidth: 3,
           pointBackgroundColor: '#D47C34',
@@ -104,20 +224,21 @@ export function generateRadarChartUrl(scores: number[]): string {
   )}`;
 }
 
-export function buildEmailHtml(data: DiagnosisEmailPayload): string {
+export function buildEmailHtml(
+  data: DiagnosisEmailPayload,
+  chartImageSrc: string = 'cid:radar-chart',
+  chartDirectUrl?: string
+): string {
   const recipient = process.env.RECIPIENT_EMAIL || 'fabianaberkana@gmail.com';
   const cleanPhone = (data.leadPhone || '').replace(/\D/g, '');
   const waLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : null;
   const dateFormatted = data.submittedAt || new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
-  // Generate the online interactive diagnosis link if provided or generate fallback
+  // Generate the online interactive diagnosis link
   const safeScoresParam = (data.scores || []).join(',');
   const appBaseUrl = data.reportUrl || `https://ais-pre-vtsujryqougixgeasmodfg-363334807308.us-east1.run.app?resultado=1&s=${safeScoresParam}${
     data.companyName ? `&empresa=${encodeURIComponent(data.companyName)}` : ''
   }${data.leadName ? `&nome=${encodeURIComponent(data.leadName)}` : ''}`;
-
-  // Generate the radar chart image URL
-  const radarChartUrl = generateRadarChartUrl(data.scores || Array(12).fill(5));
 
   return `
 <!DOCTYPE html>
@@ -214,16 +335,17 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
 
           <!-- ========================================================
                GRÁFICO DE RAIO / TEIA DOS 12 PILARES EMPRESARIAIS
+               (Embutido diretamente no corpo do e-mail)
                ======================================================== -->
           <tr>
             <td style="padding:14px 26px;">
               <table role="presentation" width="100%" style="background-color:#FAF6F0;border:1px solid rgba(136,24,109,0.20);border-radius:20px;overflow:hidden;box-shadow:0 4px 16px rgba(136,24,109,0.05);">
                 <tr>
-                  <td style="padding:20px 20px 10px;text-align:center;">
+                  <td style="padding:22px 20px 8px;text-align:center;">
                     <div style="display:inline-block;padding:3px 12px;background-color:rgba(136,24,109,0.10);border:1px solid rgba(136,24,109,0.22);border-radius:20px;margin-bottom:8px;">
                       <span style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#88186D;font-weight:700;">Mapa Visual dos 12 Pilares</span>
                     </div>
-                    <h2 style="margin:4px 0 0;font-size:19px;font-weight:700;color:#2D2825;font-family:Georgia,serif;">
+                    <h2 style="margin:4px 0 0;font-size:20px;font-weight:700;color:#2D2825;font-family:Georgia,serif;">
                       Gráfico de Raio (Teia da Prosperidade)
                     </h2>
                     <p style="margin:4px 0 16px;font-size:12px;color:#706861;">
@@ -232,19 +354,19 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
                   </td>
                 </tr>
                 <tr>
-                  <td align="center" style="padding:0 12px 18px;">
-                    <!-- QuickChart High-DPI Radar Chart -->
-                    <a href="${appBaseUrl}" target="_blank" title="Clique para abrir o gráfico interativo completo" style="text-decoration:none;display:block;">
-                      <img
-                        src="${radarChartUrl}"
-                        width="540"
-                        style="display:block;margin:0 auto;max-width:100%;height:auto;border-radius:14px;border:1px solid rgba(136,24,109,0.12);"
-                        alt="Gráfico de Raio dos 12 Pilares - Método Berkana"
-                      />
-                    </a>
-                    <div style="margin-top:12px;text-align:center;">
-                      <a href="${appBaseUrl}" target="_blank" style="font-size:12px;font-weight:600;color:#88186D;text-decoration:none;">
-                        🔍 Clique no gráfico para abrir e interagir online &rarr;
+                  <td align="center" style="padding:4px 12px 18px;">
+                    <!-- Radar Chart Image embedded via CID inline attachment or direct URL -->
+                    <img
+                      src="${chartImageSrc}"
+                      width="540"
+                      style="display:block;margin:0 auto;width:100%;max-width:540px;height:auto;border-radius:14px;border:1px solid rgba(136,24,109,0.14);"
+                      alt="Gráfico de Raio dos 12 Pilares - Método Berkana"
+                    />
+
+                    <!-- Direct link to interactive view -->
+                    <div style="margin-top:14px;text-align:center;">
+                      <a href="${appBaseUrl}" target="_blank" style="display:inline-block;background-color:#FAF6F0;border:1px solid rgba(136,24,109,0.25);padding:8px 18px;border-radius:20px;font-size:12px;font-weight:600;color:#88186D;text-decoration:none;">
+                        🔍 Abrir Teia Interativa Online no Navegador &rarr;
                       </a>
                     </div>
                   </td>
@@ -279,7 +401,7 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
                   </td>
                   <td width="4%">&nbsp;</td>
                   <!-- Highest Three -->
-                  <td width="48%" valign="top" style="background-color:#F0FDF4;border:1px solid rgba(22,101,52,0.25);border-radius:16px;padding:16px;">
+                  <td width="48%" valign="top" style="background-color:#F0FDF4;border:1px solid rgba(220,38,38,0.25);border-radius:16px;padding:16px;">
                     <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:1px;">Maiores Potenciais (Fortalezas)</p>
                     <ul style="margin:0;padding-left:18px;font-size:13px;color:#064E3B;line-height:1.8;">
                       ${data.highestThree.map(item => `<li><strong style="color:#2D2825;">${item.name}</strong>: <span style="color:#16A34A;font-weight:bold;">${item.score}/10</span></li>`).join('')}
@@ -357,33 +479,70 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
   recipient: string;
 }> {
   const recipientEmail = process.env.RECIPIENT_EMAIL || 'fabianaberkana@gmail.com';
-  const htmlContent = buildEmailHtml(data);
+
+  // 1. Prepare the chart image binary and short static URL
+  const chart = await prepareRadarChart(data.scores || Array(12).fill(5));
+  
+  // Use CID attachment if chart was fetched successfully, or short static URL as fallback
+  const chartImageSrc = chart ? 'cid:radar-chart' : generateRadarChartUrl(data.scores || []);
+  const htmlContent = buildEmailHtml(data, chartImageSrc, chart?.shortUrl);
   const subject = `⭐ Novo Diagnóstico de Prosperidade: ${data.leadName || 'Novo Lead'} (${data.averageScore.toFixed(1)}/10)`;
+
+  // Resend attachments structure with CID
+  const resendAttachments = chart
+    ? [
+        {
+          filename: 'grafico-de-raio.png',
+          content: chart.base64,
+          content_id: 'radar-chart',
+          contentId: 'radar-chart',
+          contentType: 'image/png'
+        }
+      ]
+    : undefined;
+
+  // Nodemailer attachments structure with CID
+  const nodemailerAttachments = chart
+    ? [
+        {
+          filename: 'grafico-de-raio.png',
+          content: chart.buffer,
+          cid: 'radar-chart',
+          contentType: 'image/png'
+        }
+      ]
+    : undefined;
 
   // 1. Check if Resend is configured (Recommended for Vercel)
   const resendApiKey = process.env.RESEND_API_KEY;
   if (resendApiKey) {
     try {
+      const emailBody: any = {
+        from: process.env.RESEND_FROM || 'Método Berkana <onboarding@resend.dev>',
+        to: [recipientEmail],
+        reply_to: data.leadEmail || undefined,
+        subject,
+        html: htmlContent,
+      };
+
+      if (resendAttachments) {
+        emailBody.attachments = resendAttachments;
+      }
+
       const res = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${resendApiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          from: process.env.RESEND_FROM || 'Método Berkana <onboarding@resend.dev>',
-          to: [recipientEmail],
-          reply_to: data.leadEmail || undefined,
-          subject,
-          html: htmlContent,
-        }),
+        body: JSON.stringify(emailBody),
       });
 
       if (res.ok) {
-        console.log(`[EmailService] Diagnóstico enviado com sucesso via Resend para ${recipientEmail}`);
+        console.log(`[EmailService] Diagnóstico com gráfico enviado com sucesso via Resend para ${recipientEmail}`);
         return {
           success: true,
-          message: `E-mail enviado com sucesso para ${recipientEmail} via Resend.`,
+          message: `E-mail com gráfico de raio enviado com sucesso para ${recipientEmail} via Resend.`,
           provider: 'resend',
           recipient: recipientEmail,
         };
@@ -401,35 +560,41 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
 
           if (accountEmail && accountEmail !== recipientEmail) {
             console.log(`[EmailService] Entregando na conta Resend (${accountEmail}) devido à política de teste...`);
+            const fallbackBody: any = {
+              from: process.env.RESEND_FROM || 'onboarding@resend.dev',
+              to: [accountEmail],
+              reply_to: data.leadEmail || undefined,
+              subject: `[Para: ${recipientEmail}] ${subject}`,
+              html: `
+                <div style="background-color:#fff1f2;border:1px solid #f43f5e;border-radius:12px;padding:16px;margin-bottom:20px;font-family:sans-serif;color:#9f1239;font-size:13px;line-height:1.6;">
+                  <strong style="font-size:14px;display:block;margin-bottom:4px;">📌 Aviso de Configuração do Resend:</strong>
+                  Este diagnóstico foi direcionado para <strong>${recipientEmail}</strong>. No entanto, como a conta do Resend ainda não possui um domínio próprio verificado, a política de testes do Resend entrega apenas no e-mail do titular da conta (<strong>${accountEmail}</strong>).<br><br>
+                  <strong>Como enviar direto para ${recipientEmail}:</strong><br>
+                  1. Crie a conta no Resend diretamente com ${recipientEmail}, <strong>OU</strong><br>
+                  2. Verifique seu domínio (ex: seusite.com.br) no menu <em>Domains</em> do Resend, <strong>OU</strong><br>
+                  3. Configure uma regra de encaminhamento no Gmail de ${accountEmail} para ${recipientEmail}.
+                </div>
+              ` + htmlContent,
+            };
+
+            if (resendAttachments) {
+              fallbackBody.attachments = resendAttachments;
+            }
+
             const fallbackRes = await fetch('https://api.resend.com/emails', {
               method: 'POST',
               headers: {
                 Authorization: `Bearer ${resendApiKey}`,
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify({
-                from: process.env.RESEND_FROM || 'onboarding@resend.dev',
-                to: [accountEmail],
-                reply_to: data.leadEmail || undefined,
-                subject: `[Para: ${recipientEmail}] ${subject}`,
-                html: `
-                  <div style="background-color:#fff1f2;border:1px solid #f43f5e;border-radius:12px;padding:16px;margin-bottom:20px;font-family:sans-serif;color:#9f1239;font-size:13px;line-height:1.6;">
-                    <strong style="font-size:14px;display:block;margin-bottom:4px;">📌 Aviso de Configuração do Resend:</strong>
-                    Este diagnóstico foi direcionado para <strong>${recipientEmail}</strong>. No entanto, como a conta do Resend ainda não possui um domínio próprio verificado, a política de testes do Resend entrega apenas no e-mail do titular da conta (<strong>${accountEmail}</strong>).<br><br>
-                    <strong>Como enviar direto para ${recipientEmail}:</strong><br>
-                    1. Crie a conta no Resend diretamente com ${recipientEmail}, <strong>OU</strong><br>
-                    2. Verifique seu domínio (ex: seusite.com.br) no menu <em>Domains</em> do Resend, <strong>OU</strong><br>
-                    3. Configure uma regra de encaminhamento no Gmail de ${accountEmail} para ${recipientEmail}.
-                  </div>
-                ` + htmlContent,
-              }),
+              body: JSON.stringify(fallbackBody),
             });
 
             if (fallbackRes.ok) {
-              console.log(`[EmailService] Entregue com sucesso na conta vinculada: ${accountEmail}`);
+              console.log(`[EmailService] Entregue com gráfico na conta vinculada: ${accountEmail}`);
               return {
                 success: true,
-                message: `E-mail entregue em ${accountEmail} (o Resend no plano de testes sem domínio entrega na conta do titular).`,
+                message: `E-mail entregue com gráfico em ${accountEmail} (o Resend no plano de testes sem domínio entrega na conta do titular).`,
                 provider: 'resend',
                 recipient: accountEmail,
               };
@@ -462,6 +627,7 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
         replyTo: data.leadEmail || undefined,
         subject,
         html: htmlContent,
+        attachments: nodemailerAttachments,
       });
 
       console.log(`[EmailService] E-mail enviado com sucesso via SMTP para ${recipientEmail}`);
@@ -477,14 +643,14 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
   }
 
   // 3. Simulated fallback (logged locally)
-  const chartPreview = generateRadarChartUrl(data.scores || []);
   console.log(`=========================================`);
   console.log(`[EmailService - Simulação de Envio Local]`);
   console.log(`Destinatário: ${recipientEmail}`);
   console.log(`Assunto: ${subject}`);
   console.log(`Participante: ${data.leadName || 'Pendente'}`);
   console.log(`Média Geral: ${data.averageScore.toFixed(1)}/10`);
-  console.log(`Gráfico de Raio Gerado: ${chartPreview}`);
+  console.log(`Gráfico de Raio Gerado (Short URL): ${chart?.shortUrl || 'fallback'}`);
+  console.log(`Gráfico Anexado via CID: ${!!chart}`);
   console.log(`=========================================`);
 
   return {
