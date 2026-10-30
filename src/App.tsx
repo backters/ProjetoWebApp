@@ -18,6 +18,7 @@ import { SacredGeometry } from './components/SacredGeometry';
 import { RadarChart } from './components/RadarChart';
 import { PillarModal } from './components/PillarModal';
 import { LeadCaptureStep, LeadFormData } from './components/LeadCaptureStep';
+import { PaletteSwitcher, ThemeId } from './components/PaletteSwitcher';
 
 type AppStep = 'welcome' | 'quiz' | 'lead_capture' | 'result';
 
@@ -50,9 +51,46 @@ export default function App() {
   // Holds the completed report snapshot for the result screen while active inputs are reset
   const [completedDiagnosis, setCompletedDiagnosis] = useState<CompletedDiagnosis | null>(null);
 
+  // Theme mockup state: 5 sophisticated options (defaults to Marfim & Magenta Real)
+  const [theme, setTheme] = useState<ThemeId>(() => {
+    try {
+      const saved = localStorage.getItem('berkana_chosen_palette');
+      if (
+        saved &&
+        [
+          'marfim-magenta',
+          'champagne-oliva',
+          'ameixa-ouro',
+          'esmeralda-bronze',
+          'cosmica-original',
+        ].includes(saved)
+      ) {
+        return saved as ThemeId;
+      }
+    } catch {
+      // Ignore
+    }
+    return 'marfim-magenta';
+  });
+
   const [selectedPillarForModal, setSelectedPillarForModal] = useState<Pillar | null>(null);
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const hasSentInitialEmail = useRef<boolean>(false);
+
+  // Sync active theme with document data-theme attribute & save choice
+  useEffect(() => {
+    if (theme === 'marfim-magenta') {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+
+    try {
+      localStorage.setItem('berkana_chosen_palette', theme);
+    } catch {
+      // Ignore
+    }
+  }, [theme]);
 
   // Clear any previous session data on load to guarantee pristine initial state (blank & 5)
   useEffect(() => {
@@ -731,6 +769,12 @@ export default function App() {
         pillar={selectedPillarForModal}
         score={selectedPillarForModal ? displayScores[selectedPillarForModal.id - 1] : 5}
         onClose={() => setSelectedPillarForModal(null)}
+      />
+
+      {/* Seletor de Paletas de Cores com 5 opções para a cliente escolher */}
+      <PaletteSwitcher
+        currentTheme={theme}
+        onThemeChange={setTheme}
       />
     </main>
   );

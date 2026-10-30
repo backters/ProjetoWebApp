@@ -2,31 +2,225 @@
 
 :root {
   --radius: 1rem;
-  --deep: oklch(18% 0.06 300);
-  --wine: oklch(42% 0.14 5);
-  --gold: oklch(82% 0.11 80);
-  --gold-light: oklch(88% 0.09 85);
-  --gold-dark: oklch(72% 0.12 65);
+
+  /* ========================================================
+     TEMA 1 (PADRÃO): MARFIM & MAGENTA REAL (Clara / Oficial do Logo)
+     ======================================================== */
+  --background: #FAF6F0;
+  --foreground: #2D2825;
+  --card: rgba(255, 255, 255, 0.90);
+  --card-foreground: #2D2825;
+  --popover: #FFFFFF;
+  --popover-foreground: #2D2825;
+  
+  --primary: #88186D;
+  --primary-light: #A32483;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #769043;
+  --secondary-foreground: #FFFFFF;
+
+  --accent: #D47C34;
+  --accent-light: #E28D3E;
+  --accent-foreground: #FFFFFF;
+
+  --gold: #D47C34;
+  --gold-light: #E28D3E;
+  --gold-dark: #B85F1E;
+
+  --petal: #DE7A85;
+
+  --muted: #F2ECE1;
+  --muted-foreground: #706861;
+  --border: rgba(136, 24, 109, 0.16);
+  --input: rgba(136, 24, 109, 0.22);
+  --ring: #88186D;
+
+  --gradient-cosmic: radial-gradient(ellipse at 15% 10%, rgba(222, 122, 133, 0.20), transparent 45%),
+                     radial-gradient(ellipse at 85% 90%, rgba(212, 124, 52, 0.18), transparent 50%),
+                     radial-gradient(circle at 50% 40%, rgba(118, 144, 67, 0.08), transparent 60%),
+                     #FAF6F0;
+
+  --gradient-gold: linear-gradient(135deg, #88186D 0%, #D47C34 100%);
+  --gradient-magenta: linear-gradient(135deg, #9C1F7D 0%, #76125F 100%);
+  --shadow-glow: 0 10px 35px -5px rgba(136, 24, 109, 0.30);
+  --shadow-glow-strong: 0 14px 45px -4px rgba(212, 124, 52, 0.40);
+}
+
+/* ========================================================
+   TEMA 2: CHAMPAGNE & OLIVA DOURADO (Clara / Terapêutica)
+   ======================================================== */
+[data-theme="champagne-oliva"] {
+  --background: #F6F2EB;
+  --foreground: #2A2621;
+  --card: rgba(255, 255, 255, 0.88);
+  --card-foreground: #2A2621;
+  --popover: #FFFFFF;
+  --popover-foreground: #2A2621;
+  
+  --primary: #6E873C;
+  --primary-light: #85A34A;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #D47C34;
+  --secondary-foreground: #FFFFFF;
+
+  --accent: #88186D;
+  --accent-light: #A32483;
+  --accent-foreground: #FFFFFF;
+
+  --gold: #D47C34;
+  --gold-light: #E28D3E;
+  --gold-dark: #B85F1E;
+
+  --petal: #DE7A85;
+
+  --muted: #EBE4D8;
+  --muted-foreground: #6B645A;
+  --border: rgba(110, 135, 60, 0.20);
+  --input: rgba(110, 135, 60, 0.25);
+  --ring: #6E873C;
+
+  --gradient-cosmic: radial-gradient(ellipse at 10% 15%, rgba(110, 135, 60, 0.16), transparent 50%),
+                     radial-gradient(ellipse at 90% 85%, rgba(212, 124, 52, 0.18), transparent 50%),
+                     radial-gradient(circle at 50% 50%, rgba(222, 122, 133, 0.10), transparent 60%),
+                     #F6F2EB;
+
+  --gradient-gold: linear-gradient(135deg, #6E873C 0%, #D47C34 100%);
+  --gradient-magenta: linear-gradient(135deg, #88186D 0%, #DE7A85 100%);
+  --shadow-glow: 0 10px 35px -5px rgba(110, 135, 60, 0.32);
+  --shadow-glow-strong: 0 14px 45px -4px rgba(212, 124, 52, 0.40);
+}
+
+/* ========================================================
+   TEMA 3: AMEIXA IMPERIAL & OURO (Escura / Mística)
+   ======================================================== */
+[data-theme="ameixa-ouro"] {
+  --background: #1C0F1E;
+  --foreground: #F8F3F6;
+  --card: rgba(38, 20, 42, 0.85);
+  --card-foreground: #F8F3F6;
+  --popover: #26142A;
+  --popover-foreground: #F8F3F6;
+  
+  --primary: #D43CA8;
+  --primary-light: #E558BA;
+  --primary-foreground: #FFFFFF;
+
+  --secondary: #8FA74B;
+  --secondary-foreground: #1C0F1E;
+
+  --accent: #E28D3E;
+  --accent-light: #F0A358;
+  --accent-foreground: #1C0F1E;
+
+  --gold: #E28D3E;
+  --gold-light: #F0A358;
+  --gold-dark: #C67226;
+
+  --petal: #E58E97;
+
+  --muted: #2E1831;
+  --muted-foreground: #B9A8B7;
+  --border: rgba(212, 60, 168, 0.25);
+  --input: rgba(212, 60, 168, 0.32);
+  --ring: #D43CA8;
+
+  --gradient-cosmic: radial-gradient(ellipse at 20% 0%, rgba(136, 24, 109, 0.52), transparent 55%),
+                     radial-gradient(ellipse at 90% 100%, rgba(212, 124, 52, 0.38), transparent 60%),
+                     linear-gradient(160deg, #1C0F1E, #110813);
+
+  --gradient-gold: linear-gradient(135deg, #E28D3E 0%, #D43CA8 100%);
+  --gradient-magenta: linear-gradient(135deg, #E558BA 0%, #9C1F7D 100%);
+  --shadow-glow: 0 10px 40px -8px rgba(212, 60, 168, 0.45);
+  --shadow-glow-strong: 0 12px 50px -5px rgba(226, 141, 62, 0.60);
+}
+
+/* ========================================================
+   TEMA 4: ESMERALDA NOTURNA & BRONZE (Escura / Abundância & Cura)
+   ======================================================== */
+[data-theme="esmeralda-bronze"] {
+  --background: #0E1813;
+  --foreground: #F4F7F2;
+  --card: rgba(20, 36, 28, 0.85);
+  --card-foreground: #F4F7F2;
+  --popover: #16291F;
+  --popover-foreground: #F4F7F2;
+  
+  --primary: #8FB246;
+  --primary-light: #A5C953;
+  --primary-foreground: #0E1813;
+
+  --secondary: #D47C34;
+  --secondary-foreground: #FFFFFF;
+
+  --accent: #E28D3E;
+  --accent-light: #F0A358;
+  --accent-foreground: #0E1813;
+
+  --gold: #E28D3E;
+  --gold-light: #F0A358;
+  --gold-dark: #C67226;
+
+  --petal: #DE7A85;
+
+  --muted: #1A2F24;
+  --muted-foreground: #9DB5A5;
+  --border: rgba(143, 178, 70, 0.25);
+  --input: rgba(143, 178, 70, 0.32);
+  --ring: #8FB246;
+
+  --gradient-cosmic: radial-gradient(ellipse at 15% 15%, rgba(110, 135, 60, 0.40), transparent 55%),
+                     radial-gradient(ellipse at 85% 85%, rgba(212, 124, 52, 0.30), transparent 55%),
+                     radial-gradient(circle at 50% 50%, rgba(136, 24, 109, 0.20), transparent 60%),
+                     linear-gradient(160deg, #0E1813, #08100C);
+
+  --gradient-gold: linear-gradient(135deg, #E28D3E 0%, #8FB246 100%);
+  --gradient-magenta: linear-gradient(135deg, #DE7A85 0%, #88186D 100%);
+  --shadow-glow: 0 10px 40px -8px rgba(143, 178, 70, 0.45);
+  --shadow-glow-strong: 0 12px 50px -5px rgba(226, 141, 62, 0.60);
+}
+
+/* ========================================================
+   TEMA 5: CÓSMICA NOTURNA ORIGINAL (Escura / Violeta & Ouro Celestial)
+   ======================================================== */
+[data-theme="cosmica-original"] {
   --background: oklch(17% 0.05 295);
   --foreground: oklch(95% 0.02 300);
-  --card: oklch(23% 0.06 295 / 0.7);
+  --card: oklch(23% 0.06 295 / 0.75);
   --card-foreground: oklch(95% 0.02 300);
   --popover: oklch(23% 0.06 295);
   --popover-foreground: oklch(95% 0.02 300);
+  
   --primary: oklch(82% 0.11 80);
+  --primary-light: oklch(88% 0.09 85);
   --primary-foreground: oklch(20% 0.06 300);
+
   --secondary: oklch(32% 0.1 270);
   --secondary-foreground: oklch(95% 0.02 300);
+
+  --accent: oklch(42% 0.14 5);
+  --accent-light: oklch(48% 0.14 5);
+  --accent-foreground: oklch(96% 0.02 300);
+
+  --gold: oklch(82% 0.11 80);
+  --gold-light: oklch(88% 0.09 85);
+  --gold-dark: oklch(72% 0.12 65);
+
+  --petal: #DE7A85;
+
   --muted: oklch(27% 0.05 295);
   --muted-foreground: oklch(75% 0.04 300);
-  --accent: oklch(42% 0.14 5);
-  --accent-foreground: oklch(96% 0.02 300);
   --border: oklch(82% 0.11 80 / 0.18);
   --input: oklch(82% 0.11 80 / 0.25);
   --ring: oklch(82% 0.11 80);
 
-  --gradient-cosmic: radial-gradient(ellipse at 20% 0%, oklch(42% 0.14 5 / 0.55), transparent 55%), radial-gradient(ellipse at 90% 100%, oklch(35% 0.13 265 / 0.6), transparent 60%), linear-gradient(160deg, oklch(16% 0.05 300), oklch(13% 0.05 285));
+  --gradient-cosmic: radial-gradient(ellipse at 20% 0%, oklch(42% 0.14 5 / 0.55), transparent 55%),
+                     radial-gradient(ellipse at 90% 100%, oklch(35% 0.13 265 / 0.6), transparent 60%),
+                     linear-gradient(160deg, oklch(16% 0.05 300), oklch(13% 0.05 285));
+
   --gradient-gold: linear-gradient(135deg, oklch(88% 0.09 85), oklch(72% 0.12 65));
+  --gradient-magenta: linear-gradient(135deg, oklch(88% 0.09 85), oklch(72% 0.12 65));
   --shadow-glow: 0 10px 40px -10px oklch(82% 0.11 80 / 0.45);
   --shadow-glow-strong: 0 12px 50px -5px oklch(82% 0.11 80 / 0.65);
 }
@@ -58,6 +252,7 @@ body {
   min-height: 100vh;
   margin: 0;
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
 h1, h2, h3, .font-display {
@@ -114,7 +309,7 @@ h1, h2, h3, .font-display {
 .pillar {
   appearance: none;
   -webkit-appearance: none;
-  background: linear-gradient(90deg, var(--gold) var(--p, 50%), var(--muted) var(--p, 50%));
+  background: linear-gradient(90deg, var(--primary) var(--p, 50%), var(--muted) var(--p, 50%));
   border-radius: 999px;
   width: 100%;
   height: 8px;
@@ -131,7 +326,7 @@ h1, h2, h3, .font-display {
   box-shadow: var(--shadow-glow);
   cursor: pointer;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.6);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   transition: transform 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -140,8 +335,8 @@ h1, h2, h3, .font-display {
 }
 
 .pillar::-moz-range-thumb {
-  background: var(--gold);
-  border: 2px solid rgba(255, 255, 255, 0.6);
+  background: var(--primary);
+  border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
   width: 28px;
   height: 28px;

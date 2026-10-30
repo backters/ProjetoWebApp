@@ -113,6 +113,14 @@ app.get(['/api/download-zip', '/diagnostico-berkana.zip'], (_req, res) => {
   return res.sendFile(zipPath);
 });
 
+// Download mockup ZIP endpoint
+app.get('/mockup-paletas-berkana.zip', (_req, res) => {
+  const zipPath = path.resolve(__dirname, 'public', 'mockup-paletas-berkana.zip');
+  res.setHeader('Content-Type', 'application/zip');
+  res.setHeader('Content-Disposition', 'attachment; filename="mockup-paletas-berkana.zip"');
+  return res.sendFile(zipPath);
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {
     // In dev: mount Vite middlewares
