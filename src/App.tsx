@@ -18,7 +18,6 @@ import { SacredGeometry } from './components/SacredGeometry';
 import { RadarChart } from './components/RadarChart';
 import { PillarModal } from './components/PillarModal';
 import { LeadCaptureStep, LeadFormData } from './components/LeadCaptureStep';
-import { PaletteSwitcher, ThemeId } from './components/PaletteSwitcher';
 
 type AppStep = 'welcome' | 'quiz' | 'lead_capture' | 'result';
 
@@ -51,55 +50,67 @@ export default function App() {
   // Holds the completed report snapshot for the result screen while active inputs are reset
   const [completedDiagnosis, setCompletedDiagnosis] = useState<CompletedDiagnosis | null>(null);
 
-  // Theme mockup state: 10 sophisticated options (5 light, 5 dark)
-  const [theme, setTheme] = useState<ThemeId>(() => {
-    try {
-      const saved = localStorage.getItem('berkana_chosen_palette');
-      if (
-        saved &&
-        [
-          'marfim-magenta',
-          'champagne-oliva',
-          'perola-terracota',
-          'quartzo-vinho',
-          'salvia-ouro',
-          'ameixa-ouro',
-          'esmeralda-bronze',
-          'cacau-cobre',
-          'violeta-veludo',
-          'cosmica-original',
-        ].includes(saved)
-      ) {
-        return saved as ThemeId;
-      }
-    } catch {
-      // Ignore
-    }
-    return 'marfim-magenta';
-  });
-
   const [selectedPillarForModal, setSelectedPillarForModal] = useState<Pillar | null>(null);
   const [copiedNotification, setCopiedNotification] = useState<boolean>(false);
   const hasSentInitialEmail = useRef<boolean>(false);
 
-  // Sync active theme with document data-theme attribute & save choice
-  useEffect(() => {
-    if (theme === 'marfim-magenta') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-
-    try {
-      localStorage.setItem('berkana_chosen_palette', theme);
-    } catch {
-      // Ignore
-    }
-  }, [theme]);
-
-  // Clear any previous session data on load to guarantee pristine initial state (blank & 5)
+  // Check URL parameters on mount to load shared/emailed diagnosis or start fresh
   useEffect(() => {
     try {
+      const params = new URLSearchParams(window.location.search);
+      const sParam = params.get('s');
+      if (sParam) {
+        const parsedScores = sParam
+          .split(',')
+          .map((v) => Math.min(10, Math.max(1, parseInt(v, 10) || 5)));
+
+        if (parsedScores.length === 12) {
+          const nameParam = params.get('nome') || '';
+          const companyParam = params.get('empresa') || '';
+          const phoneParam = params.get('tel') || '';
+          const emailParam = params.get('email') || '';
+
+          const avg = parsedScores.reduce((a, b) => a + b, 0) / 12;
+          const sorted = parsedScores
+            .map((score, index) => ({ score, pillar: PILLARS[index], index }))
+            .sort((a, b) => a.score - b.score);
+          const low3 = sorted.slice(0, 3);
+          const high3 = sorted.slice(-3).reverse();
+          const unblock = low3[0]?.pillar || PILLARS[0];
+
+          const targetText = `Olá Fabiana! Fiz o Diagnóstico Estratégico de Prosperidade${
+            companyParam ? ` para a empresa "${companyParam}"` : ''
+          }${nameParam ? ` (${nameParam})` : ''} com média geral de ${avg.toFixed(
+            1
+          )}/10. O principal ponto a harmonizar foi "${
+            unblock.name
+          }" e quero agendar minha devolutiva completa.`;
+          const finalWhatsAppUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(targetText)}`;
+
+          setCompletedDiagnosis({
+            scores: parsedScores,
+            averageScore: avg,
+            lowestThree: low3,
+            highestThree: high3,
+            primaryUnblockPillar: unblock,
+            leadName: nameParam,
+            companyName: companyParam,
+            whatsAppUrl: finalWhatsAppUrl,
+          });
+
+          setLeadInfo({
+            name: nameParam,
+            company: companyParam,
+            phone: phoneParam,
+            email: emailParam,
+          });
+
+          setStep('result');
+          return;
+        }
+      }
+
+      // If no query parameter, clean up legacy session data to ensure blank state
       localStorage.removeItem('berkana_scores');
       localStorage.removeItem('berkana_lead');
       localStorage.removeItem('berkana_company');
@@ -124,8 +135,8 @@ export default function App() {
   const highestThree = sortedPillars.slice(-3).reverse();
   const primaryUnblockPillar = lowestThree[0]?.pillar || PILLARS[0];
 
-  // Silently dispatch email to fabianaberkana@gmail.com without showing any UI indicators
-  const silentDispatchEmail = async (contactData: LeadFormData, activeScores = scores) => {
+  // Silently dispatch email to fabianaberkana@gmail.com with radar chart and online link
+  const silentDispatchEmail = async (contactData: LeadFormData, activeScores = scores, customReportUrl?: string) => {
     try {
       const activeAvg = activeScores.reduce((a, b) => a + b, 0) / 12;
       const sorted = activeScores
@@ -134,6 +145,11 @@ export default function App() {
       const low3 = sorted.slice(0, 3);
       const high3 = sorted.slice(-3).reverse();
       const unblock = low3[0]?.pillar || PILLARS[0];
+
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const generatedReportUrl = customReportUrl || `${origin}?resultado=1&s=${activeScores.join(',')}${
+        contactData.company ? `&empresa=${encodeURIComponent(contactData.company)}` : ''
+      }${contactData.name ? `&nome=${encodeURIComponent(contactData.name)}` : ''}`;
 
       const payload = {
         leadName: contactData.name || (contactData.company ? `Empresa ${contactData.company}` : 'Participante (Pendente/Opcional)'),
@@ -161,6 +177,7 @@ export default function App() {
         },
         diagnosisText: getDiagnosis(activeAvg),
         submittedAt: new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }),
+        reportUrl: generatedReportUrl,
       };
 
       await fetch('/api/send-diagnosis', {
@@ -220,7 +237,7 @@ export default function App() {
           particleCount: 65,
           spread: 80,
           origin: { y: 0.6 },
-          colors: ['#f1ce7c', '#d4af37', '#e2c56f', '#ffffff'],
+          colors: ['#88186D', '#D47C34', '#DE7A85', '#FAF6F0'],
         });
       } catch {
         // Safe fallback
@@ -252,6 +269,11 @@ export default function App() {
     }" e quero agendar minha devolutiva completa.`;
     const finalWhatsAppUrl = `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(targetText)}`;
 
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const fullReportUrl = `${origin}?resultado=1&s=${currentScoresSnapshot.join(',')}${
+      formData.company ? `&empresa=${encodeURIComponent(formData.company)}` : ''
+    }${formData.name ? `&nome=${encodeURIComponent(formData.name)}` : ''}`;
+
     // 1. Snapshot the completed diagnosis for display
     setCompletedDiagnosis({
       scores: currentScoresSnapshot,
@@ -264,9 +286,9 @@ export default function App() {
       whatsAppUrl: finalWhatsAppUrl,
     });
 
-    // 2. Send email with the final completed contact data
+    // 2. Send email with the final completed contact data, radar chart, and direct link
     if (formData.name || formData.email || formData.phone || formData.company) {
-      silentDispatchEmail(formData, currentScoresSnapshot);
+      silentDispatchEmail(formData, currentScoresSnapshot, fullReportUrl);
     }
 
     // 3. RESTORE ALL FORM INPUTS AND ALL SELECTIONS TO INITIAL STATE:
@@ -354,6 +376,10 @@ export default function App() {
       localStorage.removeItem('berkana_scores');
       localStorage.removeItem('berkana_lead');
       localStorage.removeItem('berkana_company');
+      // Clean query string from browser bar if present
+      if (window.history.replaceState) {
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     } catch {
       // Ignore
     }
@@ -372,7 +398,7 @@ export default function App() {
           <section className="flex min-h-[78vh] animate-rise flex-col items-center justify-center text-center">
             {/* Sacred Geometry Center Emblem */}
             <div className="relative mb-6">
-              <SacredGeometry className="w-28 sm:w-32 mx-auto drop-shadow-[0_0_20px_rgba(241,206,124,0.3)]" />
+              <SacredGeometry className="w-28 sm:w-32 mx-auto drop-shadow-[0_0_20px_rgba(212,124,52,0.3)]" />
             </div>
 
             <p className="text-xs uppercase tracking-[0.35em] text-primary font-medium">
@@ -601,7 +627,7 @@ export default function App() {
             </div>
 
             {/* Radar Chart Display */}
-            <div className="flex flex-col items-center rounded-3xl border border-border bg-card/80 p-5 sm:p-6 backdrop-blur-md shadow-2xl">
+            <div className="flex flex-col items-center rounded-3xl border border-border bg-card/90 p-5 sm:p-6 backdrop-blur-md shadow-2xl">
               <RadarChart
                 scores={displayScores}
                 onSelectPillar={(index) => setSelectedPillarForModal(PILLARS[index])}
@@ -612,7 +638,7 @@ export default function App() {
             </div>
 
             {/* Numbered List of all 12 Pillars with Click Action */}
-            <div className="rounded-2xl border border-border/80 bg-card/40 p-4 backdrop-blur-sm">
+            <div className="rounded-2xl border border-border/80 bg-card/60 p-4 backdrop-blur-sm">
               <ol className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-muted-foreground sm:grid-cols-3">
                 {PILLARS.map((pillar, idx) => (
                   <li
@@ -634,10 +660,10 @@ export default function App() {
             {/* Breakdown Cards: Harmonization vs Potentials */}
             <div className="grid gap-4 sm:grid-cols-2">
               {/* Harmonization Points (Top 3 Lowest) */}
-              <div className="rounded-3xl border border-border p-6 bg-accent/30 backdrop-blur-sm">
+              <div className="rounded-3xl border border-red-200/40 p-6 bg-red-50/40 backdrop-blur-sm">
                 <div className="flex items-center justify-between">
                   <h3 className="text-2xl font-medium text-foreground">Pontos de harmonização</h3>
-                  <span className="text-xs uppercase tracking-wider text-primary">Prioridades</span>
+                  <span className="text-xs uppercase tracking-wider text-red-600 font-semibold">Prioridades</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 mb-3">
                   Pilares que pedem atenção e destravamento para desbloquear o fluxo:
@@ -647,23 +673,23 @@ export default function App() {
                     <li
                       key={pillar.id}
                       onClick={() => setSelectedPillarForModal(pillar)}
-                      className="flex items-center justify-between p-2 rounded-xl bg-background/40 hover:bg-background/70 border border-border/50 text-sm cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-2 rounded-xl bg-card/80 hover:bg-card border border-red-200/50 text-sm cursor-pointer transition-colors"
                     >
                       <div>
                         <span className="font-medium text-foreground">{pillar.name}</span>
                         <p className="text-[11px] text-muted-foreground line-clamp-1">{pillar.subtitle}</p>
                       </div>
-                      <span className="text-primary font-bold text-base px-2">{score}</span>
+                      <span className="text-red-600 font-bold text-base px-2">{score}</span>
                     </li>
                   ))}
                 </ul>
               </div>
 
               {/* Potentials (Top 3 Highest) */}
-              <div className="rounded-3xl border border-border p-6 bg-secondary/40 backdrop-blur-sm">
+              <div className="rounded-3xl border border-emerald-200/40 p-6 bg-emerald-50/40 backdrop-blur-sm">
                 <div className="flex items-center justify-between">
                   <h3 className="text-2xl font-medium text-foreground">Maiores potenciais</h3>
-                  <span className="text-xs uppercase tracking-wider text-emerald-400">Fortalezas</span>
+                  <span className="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Fortalezas</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 mb-3">
                   Pilares sólidos e de alta vibração que impulsionam o seu negócio:
@@ -673,13 +699,13 @@ export default function App() {
                     <li
                       key={pillar.id}
                       onClick={() => setSelectedPillarForModal(pillar)}
-                      className="flex items-center justify-between p-2 rounded-xl bg-background/40 hover:bg-background/70 border border-border/50 text-sm cursor-pointer transition-colors"
+                      className="flex items-center justify-between p-2 rounded-xl bg-card/80 hover:bg-card border border-emerald-200/50 text-sm cursor-pointer transition-colors"
                     >
                       <div>
                         <span className="font-medium text-foreground">{pillar.name}</span>
                         <p className="text-[11px] text-muted-foreground line-clamp-1">{pillar.subtitle}</p>
                       </div>
-                      <span className="text-primary font-bold text-base px-2">{score}</span>
+                      <span className="text-emerald-700 font-bold text-base px-2">{score}</span>
                     </li>
                   ))}
                 </ul>
@@ -703,8 +729,8 @@ export default function App() {
                 {getDiagnosis(displayAverage)}
               </p>
 
-              <div className="mt-4 p-4 rounded-2xl bg-muted/40 border border-border/80">
-                <p className="leading-relaxed text-sm text-muted-foreground">
+              <div className="mt-4 p-4 rounded-2xl bg-muted/60 border border-border/80">
+                <p className="leading-relaxed text-sm text-foreground/80">
                   O pilar <strong className="text-primary font-semibold">{displayUnblock.name}</strong> é hoje a principal porta de desobstrução — ao harmonizá-lo, toda a roda se reequilibra.
                 </p>
               </div>
@@ -731,12 +757,12 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleCopySummary}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/80 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
                 >
                   {copiedNotification ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span className="text-emerald-400">Resumo Copiado!</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span className="text-emerald-600 font-medium">Resumo Copiado!</span>
                     </>
                   ) : (
                     <>
@@ -749,7 +775,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handlePrint}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/80 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Imprimir / Salvar PDF</span>
@@ -758,7 +784,7 @@ export default function App() {
                 <button
                   type="button"
                   onClick={handleRestart}
-                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/60 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 text-xs rounded-full border border-border bg-card/80 text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   <span>Refazer Diagnóstico</span>
@@ -774,12 +800,6 @@ export default function App() {
         pillar={selectedPillarForModal}
         score={selectedPillarForModal ? displayScores[selectedPillarForModal.id - 1] : 5}
         onClose={() => setSelectedPillarForModal(null)}
-      />
-
-      {/* Seletor de Paletas de Cores com 5 opções para a cliente escolher */}
-      <PaletteSwitcher
-        currentTheme={theme}
-        onThemeChange={setTheme}
       />
     </main>
   );

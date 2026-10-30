@@ -12,6 +12,7 @@ export interface DiagnosisEmailPayload {
   primaryUnblockPillar: { id: number; name: string; subtitle?: string };
   diagnosisText: string;
   submittedAt?: string;
+  reportUrl?: string;
 }
 
 export const PILLAR_NAMES = [
@@ -29,64 +30,161 @@ export const PILLAR_NAMES = [
   'Legado e Impacto'
 ];
 
+/**
+ * Generates a high-definition radar chart image URL via QuickChart.
+ * Renders in the official Option 1 color palette (Marfim & Magenta Real).
+ */
+export function generateRadarChartUrl(scores: number[]): string {
+  const labels = [
+    ['1. Missão', 'e Valores'],
+    ['2. Propósito', 'Organizacional'],
+    ['3. Cultura', 'e Clima'],
+    ['4. Comunicação', 'Interna'],
+    ['5. Liderança', 'e Decisão'],
+    ['6. Engajamento', 'da Equipe'],
+    ['7. Produtividade', 'com Equilíbrio'],
+    ['8. Inovação e', 'Criatividade'],
+    ['9. Crises e', 'Resiliência'],
+    ['10. Fluxo', 'Financeiro'],
+    ['11. Reputação', 'da Marca'],
+    ['12. Legado e', 'Impacto']
+  ];
+
+  const chartConfig = {
+    type: 'radar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Pontuação (1-10)',
+          data: scores,
+          backgroundColor: 'rgba(212, 124, 52, 0.38)',
+          borderColor: '#88186D',
+          borderWidth: 3,
+          pointBackgroundColor: '#D47C34',
+          pointBorderColor: '#88186D',
+          pointBorderWidth: 2,
+          pointRadius: 5
+        }
+      ]
+    },
+    options: {
+      legend: { display: false },
+      scale: {
+        ticks: {
+          beginAtZero: true,
+          min: 0,
+          max: 10,
+          stepSize: 2,
+          fontColor: '#706861',
+          fontSize: 10,
+          backdropColor: 'transparent',
+          showLabelBackdrop: false
+        },
+        gridLines: {
+          color: 'rgba(136, 24, 109, 0.20)',
+          lineWidth: 1
+        },
+        angleLines: {
+          color: 'rgba(212, 124, 52, 0.32)',
+          lineWidth: 1
+        },
+        pointLabels: {
+          fontSize: 10.5,
+          fontColor: '#2D2825',
+          fontStyle: 'bold',
+          fontFamily: 'sans-serif'
+        }
+      }
+    }
+  };
+
+  return `https://quickchart.io/chart?w=580&h=520&bkg=%23FAF6F0&devicePixelRatio=2&c=${encodeURIComponent(
+    JSON.stringify(chartConfig)
+  )}`;
+}
+
 export function buildEmailHtml(data: DiagnosisEmailPayload): string {
   const recipient = process.env.RECIPIENT_EMAIL || 'fabianaberkana@gmail.com';
   const cleanPhone = (data.leadPhone || '').replace(/\D/g, '');
   const waLink = cleanPhone ? `https://wa.me/${cleanPhone.startsWith('55') ? cleanPhone : '55' + cleanPhone}` : null;
   const dateFormatted = data.submittedAt || new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
 
+  // Generate the online interactive diagnosis link if provided or generate fallback
+  const safeScoresParam = (data.scores || []).join(',');
+  const appBaseUrl = data.reportUrl || `https://ais-pre-vtsujryqougixgeasmodfg-363334807308.us-east1.run.app?resultado=1&s=${safeScoresParam}${
+    data.companyName ? `&empresa=${encodeURIComponent(data.companyName)}` : ''
+  }${data.leadName ? `&nome=${encodeURIComponent(data.leadName)}` : ''}`;
+
+  // Generate the radar chart image URL
+  const radarChartUrl = generateRadarChartUrl(data.scores || Array(12).fill(5));
+
   return `
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <title>Novo Diagnóstico de Prosperidade</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diagnóstico Estratégico de Prosperidade - Método Berkana</title>
 </head>
-<body style="margin:0;padding:0;background-color:#161021;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#f0edf6;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#161021;padding:30px 15px;">
+<body style="margin:0;padding:0;background-color:#FAF6F0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#2D2825;-webkit-font-smoothing:antialiased;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#FAF6F0;padding:30px 12px;">
     <tr>
       <td align="center">
-        <table role="presentation" width="100%" style="max-width:620px;background-color:#20172e;border:1px solid rgba(241,206,124,0.3);border-radius:24px;overflow:hidden;box-shadow:0 12px 40px rgba(0,0,0,0.5);">
-          <!-- Header Banner -->
+        <table role="presentation" width="100%" style="max-width:620px;background-color:#FFFFFF;border:1px solid rgba(136,24,109,0.22);border-radius:24px;overflow:hidden;box-shadow:0 12px 35px rgba(136,24,109,0.08);">
+          
+          <!-- Header Banner (Opção 1: Magenta Real & Âmbar Solar) -->
           <tr>
-            <td style="background:linear-gradient(135deg, #2f193f 0%, #1a102b 100%);padding:36px 30px;text-align:center;border-bottom:1px solid rgba(241,206,124,0.25);">
-              <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:4px;color:#f1ce7c;font-weight:600;">Método Berkana Empresarial</p>
-              <h1 style="margin:12px 0 0;font-size:26px;font-weight:600;color:#ffffff;line-height:1.2;">Novo Diagnóstico de Prosperidade</h1>
-              <p style="margin:8px 0 0;font-size:13px;color:#b9b0cb;">Resultado finalizado e pronto para devolutiva</p>
+            <td style="background:linear-gradient(135deg, #88186D 0%, #630E4E 100%);padding:36px 28px;text-align:center;border-bottom:3px solid #D47C34;">
+              <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:4px;color:#FBD38D;font-weight:700;">Método Berkana Empresarial</p>
+              <h1 style="margin:12px 0 0;font-size:25px;font-weight:700;color:#FFFFFF;line-height:1.2;font-family:Georgia,serif;">
+                Diagnóstico Estratégico de Prosperidade
+              </h1>
+              <p style="margin:8px 0 0;font-size:13px;color:#FCD5DF;">Relatório sistêmico completo com gráfico e devolutiva</p>
+            </td>
+          </tr>
+
+          <!-- Link Direct Banner -->
+          <tr>
+            <td style="background-color:#F5EBE6;padding:12px 24px;text-align:center;border-bottom:1px solid rgba(136,24,109,0.12);">
+              <span style="font-size:12px;color:#706861;">🌐 Relatório Interativo Online: </span>
+              <a href="${appBaseUrl}" target="_blank" style="font-size:12px;font-weight:700;color:#88186D;text-decoration:none;">
+                Visualizar no Navegador com Teia Interativa &rarr;
+              </a>
             </td>
           </tr>
 
           <!-- Lead Info Card -->
           <tr>
-            <td style="padding:28px 30px 10px;">
-              <table role="presentation" width="100%" style="background-color:#171024;border:1px solid rgba(241,206,124,0.18);border-radius:16px;padding:20px;">
+            <td style="padding:26px 26px 10px;">
+              <table role="presentation" width="100%" style="background-color:#FAF6F0;border:1px solid rgba(136,24,109,0.16);border-radius:18px;padding:20px;">
                 <tr>
                   <td>
-                    <p style="margin:0 0 14px;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#f1ce7c;font-weight:600;">Dados do Participante</p>
+                    <p style="margin:0 0 14px;font-size:11px;text-transform:uppercase;letter-spacing:2px;color:#88186D;font-weight:700;">Dados do Participante</p>
                     <table role="presentation" width="100%" style="font-size:14px;line-height:1.8;">
                       <tr>
-                        <td style="color:#9e94b4;width:110px;">Nome:</td>
-                        <td style="color:#ffffff;font-weight:600;">${data.leadName || 'Não informado'}</td>
+                        <td style="color:#706861;width:110px;font-weight:500;">Nome:</td>
+                        <td style="color:#2D2825;font-weight:700;">${data.leadName || 'Não informado'}</td>
                       </tr>
                       <tr>
-                        <td style="color:#9e94b4;">E-mail:</td>
-                        <td><a href="mailto:${data.leadEmail}" style="color:#f1ce7c;text-decoration:none;">${data.leadEmail || 'Não informado'}</a></td>
+                        <td style="color:#706861;font-weight:500;">E-mail:</td>
+                        <td><a href="mailto:${data.leadEmail}" style="color:#88186D;font-weight:600;text-decoration:none;">${data.leadEmail || 'Não informado'}</a></td>
                       </tr>
                       <tr>
-                        <td style="color:#9e94b4;">WhatsApp:</td>
+                        <td style="color:#706861;font-weight:500;">WhatsApp:</td>
                         <td>
-                          ${data.leadPhone || 'Não informado'}
-                          ${waLink ? ` &nbsp;·&nbsp; <a href="${waLink}" target="_blank" style="color:#34d399;text-decoration:none;font-weight:600;">Abrir WhatsApp &rarr;</a>` : ''}
+                          <span style="color:#2D2825;font-weight:600;">${data.leadPhone || 'Não informado'}</span>
+                          ${waLink ? ` &nbsp;·&nbsp; <a href="${waLink}" target="_blank" style="display:inline-block;color:#059669;font-weight:700;text-decoration:none;background:#ECFDF5;padding:2px 8px;border-radius:6px;border:1px solid #A7F3D0;font-size:12px;">Abrir WhatsApp &rarr;</a>` : ''}
                         </td>
                       </tr>
                       ${data.companyName ? `
                       <tr>
-                        <td style="color:#9e94b4;">Empresa:</td>
-                        <td style="color:#ffffff;">${data.companyName}</td>
+                        <td style="color:#706861;font-weight:500;">Empresa:</td>
+                        <td style="color:#2D2825;font-weight:600;">${data.companyName}</td>
                       </tr>` : ''}
                       <tr>
-                        <td style="color:#9e94b4;">Data/Hora:</td>
-                        <td style="color:#c5bcd7;font-size:12px;">${dateFormatted}</td>
+                        <td style="color:#706861;font-weight:500;">Data e Hora:</td>
+                        <td style="color:#706861;font-size:12px;">${dateFormatted}</td>
                       </tr>
                     </table>
                   </td>
@@ -97,15 +195,15 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
 
           <!-- Score Big Box -->
           <tr>
-            <td style="padding:15px 30px;">
-              <table role="presentation" width="100%" style="background:linear-gradient(135deg, rgba(241,206,124,0.15), rgba(87,94,207,0.15));border:1px solid #f1ce7c;border-radius:18px;padding:24px;text-align:center;">
+            <td style="padding:10px 26px;">
+              <table role="presentation" width="100%" style="background:linear-gradient(135deg, #FFF7ED 0%, #FAF6F0 100%);border:2px solid #D47C34;border-radius:18px;padding:22px;text-align:center;">
                 <tr>
                   <td>
-                    <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#f1ce7c;font-weight:600;">Média Geral dos 12 Pilares</p>
-                    <div style="margin:8px 0;font-size:52px;font-weight:bold;color:#f1ce7c;letter-spacing:-1px;">
-                      ${data.averageScore.toFixed(1)} <span style="font-size:20px;color:#b9b0cb;font-weight:normal;">/ 10</span>
+                    <p style="margin:0;font-size:11px;text-transform:uppercase;letter-spacing:3px;color:#D47C34;font-weight:700;">Média Geral dos 12 Pilares</p>
+                    <div style="margin:8px 0;font-size:52px;font-weight:bold;color:#88186D;letter-spacing:-1px;font-family:Georgia,serif;">
+                      ${data.averageScore.toFixed(1)} <span style="font-size:20px;color:#706861;font-weight:normal;">/ 10</span>
                     </div>
-                    <p style="margin:0;font-size:13px;color:#e2daf2;max-width:440px;margin:0 auto;line-height:1.5;">
+                    <p style="margin:0;font-size:14px;color:#2D2825;max-width:480px;margin:0 auto;line-height:1.6;">
                       ${data.diagnosisText}
                     </p>
                   </td>
@@ -114,13 +212,54 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
             </td>
           </tr>
 
+          <!-- ========================================================
+               GRÁFICO DE RAIO / TEIA DOS 12 PILARES EMPRESARIAIS
+               ======================================================== -->
+          <tr>
+            <td style="padding:14px 26px;">
+              <table role="presentation" width="100%" style="background-color:#FAF6F0;border:1px solid rgba(136,24,109,0.20);border-radius:20px;overflow:hidden;box-shadow:0 4px 16px rgba(136,24,109,0.05);">
+                <tr>
+                  <td style="padding:20px 20px 10px;text-align:center;">
+                    <div style="display:inline-block;padding:3px 12px;background-color:rgba(136,24,109,0.10);border:1px solid rgba(136,24,109,0.22);border-radius:20px;margin-bottom:8px;">
+                      <span style="font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#88186D;font-weight:700;">Mapa Visual dos 12 Pilares</span>
+                    </div>
+                    <h2 style="margin:4px 0 0;font-size:19px;font-weight:700;color:#2D2825;font-family:Georgia,serif;">
+                      Gráfico de Raio (Teia da Prosperidade)
+                    </h2>
+                    <p style="margin:4px 0 16px;font-size:12px;color:#706861;">
+                      Visualização completa da harmonia energética de cada pilar avaliado
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="center" style="padding:0 12px 18px;">
+                    <!-- QuickChart High-DPI Radar Chart -->
+                    <a href="${appBaseUrl}" target="_blank" title="Clique para abrir o gráfico interativo completo" style="text-decoration:none;display:block;">
+                      <img
+                        src="${radarChartUrl}"
+                        width="540"
+                        style="display:block;margin:0 auto;max-width:100%;height:auto;border-radius:14px;border:1px solid rgba(136,24,109,0.12);"
+                        alt="Gráfico de Raio dos 12 Pilares - Método Berkana"
+                      />
+                    </a>
+                    <div style="margin-top:12px;text-align:center;">
+                      <a href="${appBaseUrl}" target="_blank" style="font-size:12px;font-weight:600;color:#88186D;text-decoration:none;">
+                        🔍 Clique no gráfico para abrir e interagir online &rarr;
+                      </a>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
           <!-- Critical Unblocking Pillar -->
           <tr>
-            <td style="padding:5px 30px 15px;">
-              <div style="background-color:#3d1a24;border-left:4px solid #f87171;border-radius:10px;padding:14px 18px;">
-                <p style="margin:0;font-size:12px;font-weight:600;color:#fca5a5;text-transform:uppercase;letter-spacing:1px;">Porta de Desobstrução Prioritária</p>
-                <p style="margin:4px 0 0;font-size:14px;color:#ffffff;">
-                  O pilar <strong style="color:#f1ce7c;">${data.primaryUnblockPillar.name}</strong> é atualmente a principal chave sistêmica para destravar o fluxo de prosperidade desta organização.
+            <td style="padding:6px 26px 14px;">
+              <div style="background-color:#FFF5F5;border-left:5px solid #88186D;border-radius:12px;padding:16px 20px;border:1px solid rgba(136,24,109,0.15);border-left-width:5px;">
+                <p style="margin:0;font-size:11px;font-weight:700;color:#88186D;text-transform:uppercase;letter-spacing:1.5px;">Porta de Desobstrução Prioritária</p>
+                <p style="margin:6px 0 0;font-size:14px;color:#2D2825;line-height:1.5;">
+                  O pilar <strong style="color:#88186D;font-weight:700;">${data.primaryUnblockPillar.name}</strong> é hoje a principal chave para destravar o fluxo de prosperidade. Ao harmonizá-lo, todos os outros pilares voltam a fluir com facilidade.
                 </p>
               </div>
             </td>
@@ -128,22 +267,22 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
 
           <!-- 2 Columns: Harmonization & Strengths -->
           <tr>
-            <td style="padding:10px 30px;">
+            <td style="padding:8px 26px 14px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <!-- Lowest Three -->
-                  <td width="48%" valign="top" style="background-color:#1c1328;border:1px solid rgba(248,113,113,0.3);border-radius:14px;padding:16px;">
-                    <p style="margin:0 0 10px;font-size:12px;font-weight:600;color:#fca5a5;text-transform:uppercase;letter-spacing:1px;">Pontos a Harmonizar (Menores)</p>
-                    <ul style="margin:0;padding-left:18px;font-size:13px;color:#ded6ef;line-height:1.8;">
-                      ${data.lowestThree.map(item => `<li><strong>${item.name}</strong>: <span style="color:#fca5a5;font-weight:bold;">${item.score}/10</span></li>`).join('')}
+                  <td width="48%" valign="top" style="background-color:#FFF7F7;border:1px solid rgba(220,38,38,0.25);border-radius:16px;padding:16px;">
+                    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:1px;">Pontos a Harmonizar (Prioridades)</p>
+                    <ul style="margin:0;padding-left:18px;font-size:13px;color:#450A0A;line-height:1.8;">
+                      ${data.lowestThree.map(item => `<li><strong style="color:#2D2825;">${item.name}</strong>: <span style="color:#DC2626;font-weight:bold;">${item.score}/10</span></li>`).join('')}
                     </ul>
                   </td>
                   <td width="4%">&nbsp;</td>
                   <!-- Highest Three -->
-                  <td width="48%" valign="top" style="background-color:#1c1328;border:1px solid rgba(52,211,153,0.3);border-radius:14px;padding:16px;">
-                    <p style="margin:0 0 10px;font-size:12px;font-weight:600;color:#6ee7b7;text-transform:uppercase;letter-spacing:1px;">Maiores Potenciais (Altos)</p>
-                    <ul style="margin:0;padding-left:18px;font-size:13px;color:#ded6ef;line-height:1.8;">
-                      ${data.highestThree.map(item => `<li><strong>${item.name}</strong>: <span style="color:#6ee7b7;font-weight:bold;">${item.score}/10</span></li>`).join('')}
+                  <td width="48%" valign="top" style="background-color:#F0FDF4;border:1px solid rgba(22,101,52,0.25);border-radius:16px;padding:16px;">
+                    <p style="margin:0 0 10px;font-size:11px;font-weight:700;color:#16A34A;text-transform:uppercase;letter-spacing:1px;">Maiores Potenciais (Fortalezas)</p>
+                    <ul style="margin:0;padding-left:18px;font-size:13px;color:#064E3B;line-height:1.8;">
+                      ${data.highestThree.map(item => `<li><strong style="color:#2D2825;">${item.name}</strong>: <span style="color:#16A34A;font-weight:bold;">${item.score}/10</span></li>`).join('')}
                     </ul>
                   </td>
                 </tr>
@@ -151,39 +290,57 @@ export function buildEmailHtml(data: DiagnosisEmailPayload): string {
             </td>
           </tr>
 
-          <!-- Complete 12 Pillars Table -->
+          <!-- Complete 12 Pillars Breakdown Table with Visual Bars -->
           <tr>
-            <td style="padding:15px 30px;">
-              <p style="margin:0 0 10px;font-size:12px;font-weight:600;color:#f1ce7c;text-transform:uppercase;letter-spacing:1.5px;">Tabela Completa dos 12 Pilares</p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#171024;border-radius:12px;overflow:hidden;border:1px solid rgba(255,255,255,0.08);font-size:13px;">
-                ${data.scores.map((score, idx) => `
-                  <tr style="border-bottom:1px solid rgba(255,255,255,0.06);background-color:${idx % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent'};">
-                    <td style="padding:10px 14px;color:#9e94b4;width:30px;">${idx + 1}.</td>
-                    <td style="padding:10px 14px;color:#ffffff;font-weight:500;">${PILLAR_NAMES[idx] || `Pilar ${idx + 1}`}</td>
-                    <td style="padding:10px 14px;text-align:right;color:#f1ce7c;font-weight:bold;">${score} / 10</td>
+            <td style="padding:10px 26px 20px;">
+              <p style="margin:0 0 12px;font-size:12px;font-weight:700;color:#88186D;text-transform:uppercase;letter-spacing:1.5px;">Tabela Completa das Notas dos 12 Pilares</p>
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color:#FAF6F0;border-radius:14px;overflow:hidden;border:1px solid rgba(136,24,109,0.18);font-size:13px;">
+                ${(data.scores || []).map((score, idx) => {
+                  const pct = Math.round((score / 10) * 100);
+                  const isLow = score <= 6;
+                  const isHigh = score >= 9;
+                  const barColor = isLow ? '#DC2626' : isHigh ? '#769043' : '#D47C34';
+                  return `
+                  <tr style="border-bottom:1px solid rgba(136,24,109,0.08);background-color:${idx % 2 === 0 ? '#FFFFFF' : 'transparent'};">
+                    <td style="padding:10px 12px;color:#706861;width:24px;font-weight:600;">${idx + 1}.</td>
+                    <td style="padding:10px 12px;color:#2D2825;font-weight:600;width:45%;">${PILLAR_NAMES[idx] || `Pilar ${idx + 1}`}</td>
+                    <td style="padding:10px 12px;width:35%;">
+                      <div style="background-color:#EBE4D8;height:8px;border-radius:999px;overflow:hidden;width:100%;">
+                        <div style="background-color:${barColor};height:100%;width:${pct}%;border-radius:999px;"></div>
+                      </div>
+                    </td>
+                    <td style="padding:10px 12px;text-align:right;color:#88186D;font-weight:700;font-size:14px;">${score}/10</td>
                   </tr>
-                `).join('')}
+                  `;
+                }).join('')}
               </table>
             </td>
           </tr>
 
-          <!-- Action Button for Admin -->
+          <!-- Action Buttons / Next Steps -->
           <tr>
-            <td style="padding:20px 30px 35px;text-align:center;">
+            <td style="padding:10px 26px 36px;text-align:center;background-color:#FAF6F0;border-top:1px solid rgba(136,24,109,0.12);">
+              <div style="margin-bottom:16px;">
+                <a href="${appBaseUrl}" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #88186D 0%, #D47C34 100%);color:#FFFFFF;font-weight:bold;text-decoration:none;padding:14px 30px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(136,24,109,0.25);">
+                  🌐 Abrir Diagnóstico Completo Interativo no Navegador &rarr;
+                </a>
+              </div>
+
               ${waLink ? `
-                <a href="${waLink}" target="_blank" style="display:inline-block;background:linear-gradient(135deg, #f1ce7c 0%, #d4af37 100%);color:#1a1024;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:14px;box-shadow:0 8px 24px rgba(241,206,124,0.35);">
-                  Conversar com ${data.leadName || 'o participante'} no WhatsApp &rarr;
+              <div style="margin-bottom:14px;">
+                <a href="${waLink}" target="_blank" style="display:inline-block;background-color:#059669;color:#FFFFFF;font-weight:bold;text-decoration:none;padding:11px 24px;border-radius:999px;font-size:13px;">
+                  💬 Conversar com ${data.leadName || 'o participante'} no WhatsApp &rarr;
                 </a>
-              ` : `
-                <a href="mailto:${data.leadEmail}" style="display:inline-block;background:linear-gradient(135deg, #f1ce7c 0%, #d4af37 100%);color:#1a1024;font-weight:bold;text-decoration:none;padding:14px 28px;border-radius:999px;font-size:14px;">
-                  Responder para ${data.leadEmail} &rarr;
-                </a>
-              `}
-              <p style="margin:18px 0 0;font-size:11px;color:#7e7494;">
-                Enviado automaticamente pelo app de Diagnóstico Estratégico de Prosperidade para ${recipient}
+              </div>
+              ` : ''}
+
+              <p style="margin:16px 0 0;font-size:11px;color:#706861;line-height:1.5;">
+                Este relatório foi gerado e enviado automaticamente pelo app <strong>Diagnóstico Estratégico de Prosperidade</strong> para <strong>${recipient}</strong>.<br>
+                Método Berkana · Fabiana Berkana
               </p>
             </td>
           </tr>
+
         </table>
       </td>
     </tr>
@@ -307,32 +464,32 @@ export async function sendDiagnosisEmail(data: DiagnosisEmailPayload): Promise<{
         html: htmlContent,
       });
 
-      console.log(`[EmailService] Diagnóstico enviado com sucesso via SMTP para ${recipientEmail}`);
+      console.log(`[EmailService] E-mail enviado com sucesso via SMTP para ${recipientEmail}`);
       return {
         success: true,
         message: `E-mail enviado com sucesso para ${recipientEmail} via SMTP.`,
         provider: 'smtp',
         recipient: recipientEmail,
       };
-    } catch (err: any) {
-      console.error(`[EmailService] Erro no envio SMTP:`, err?.message || err);
+    } catch (err) {
+      console.error(`[EmailService] Erro ao enviar via SMTP:`, err);
     }
   }
 
-  // 3. Fallback: Simulation mode with clean logging
-  console.log(`\n======================================================`);
-  console.log(`[EmailService - REGISTRO DE DIAGNÓSTICO RECEBIDO]`);
+  // 3. Simulated fallback (logged locally)
+  const chartPreview = generateRadarChartUrl(data.scores || []);
+  console.log(`=========================================`);
+  console.log(`[EmailService - Simulação de Envio Local]`);
   console.log(`Destinatário: ${recipientEmail}`);
-  console.log(`Participante: ${data.leadName} (${data.leadEmail} / ${data.leadPhone})`);
-  console.log(`Empresa: ${data.companyName || 'N/A'}`);
+  console.log(`Assunto: ${subject}`);
+  console.log(`Participante: ${data.leadName || 'Pendente'}`);
   console.log(`Média Geral: ${data.averageScore.toFixed(1)}/10`);
-  console.log(`Pilar de Desobstrução: ${data.primaryUnblockPillar.name}`);
-  console.log(`Status: Salvo com sucesso! Para envio de e-mail em tempo real no Vercel, adicione RESEND_API_KEY ou credenciais SMTP nas Environment Variables.`);
-  console.log(`======================================================\n`);
+  console.log(`Gráfico de Raio Gerado: ${chartPreview}`);
+  console.log(`=========================================`);
 
   return {
     success: true,
-    message: `Diagnóstico registrado e formatado para ${recipientEmail}.`,
+    message: `Diagnóstico registrado e simulado para ${recipientEmail}.`,
     provider: 'simulated',
     recipient: recipientEmail,
   };
